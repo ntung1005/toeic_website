@@ -891,12 +891,4 @@ data.studyPlan = [
 
 fs.writeFileSync(sourcePath, `${JSON.stringify(data, null, 2)}\n`);
 
-const apiData = {
-  ...data,
-  stats: [{ id: 1, ...data.stats }],
-  sentences: data.sentences.map((text, index) => ({ id: index + 1, text })),
-  studyPlan: data.studyPlan.map((text, index) => ({ id: index + 1, text }))
-};
-
-fs.writeFileSync("db.json", `${JSON.stringify(apiData, null, 2)}\n`);
 console.log(`Expanded TOEIC data: ${vocabulary.length} words, ${sentencePatterns.length} sentence patterns, ${quiz.length} exercises.`);

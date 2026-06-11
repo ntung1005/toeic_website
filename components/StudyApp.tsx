@@ -1,7 +1,9 @@
 "use client";
 
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { db } from "@/lib/firebase";
 
 type Vocabulary = {
   id: number;
@@ -123,37 +125,98 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "plan", label: "Lo trinh" }
 ];
 
-export default function StudyApp({ initialData }: { initialData: ToeicData }) {
+type UserProgress = {
+  learnedIds: number[];
+  answers: Record<string, string>;
+  completedLessons: number[];
+  completedLessonDetails?: Record<string, LessonCompletion>;
+  selectedLessonId?: number;
+  updatedAt?: string;
+};
+
+type LessonCompletion = {
+  completedAt: string;
+  quizScore: number;
+  quizTotal: number;
+  learnedWords: number;
+  totalWords: number;
+};
+
+export default function StudyApp({
+  initialData,
+  userId,
+  username
+}: {
+  initialData: ToeicData;
+  userId?: string | null;
+  username?: string | null;
+}) {
   const [activeTab, setActiveTab] = useState<Tab>("vocabulary");
   const [topic, setTopic] = useState("all");
   const [studyMode, setStudyMode] = useState<"roadmap" | "tenses">("roadmap");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [learnedIds, setLearnedIds] = useState<number[]>([]);
   const [completedLessons, setCompletedLessons] = useState<number[]>([]);
+  const [completedLessonDetails, setCompletedLessonDetails] = useState<Record<string, LessonCompletion>>({});
   const [selectedLessonId, setSelectedLessonId] = useState(1);
   const [quizSeed, setQuizSeed] = useState(1);
+  const [progressLoaded, setProgressLoaded] = useState(false);
+  const [progressStatus, setProgressStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   useEffect(() => {
-    const savedProgress = window.localStorage.getItem("toeic-progress");
-    if (!savedProgress) return;
+    let cancelled = false;
 
-    try {
-      const parsed = JSON.parse(savedProgress) as {
-        learnedIds?: number[];
-        answers?: Record<string, string>;
-        completedLessons?: number[];
-      };
+    async function loadProgress() {
+      setProgressLoaded(false);
+
+      if (!userId) {
+        const emptyProgress = createEmptyProgress();
+        setLearnedIds(emptyProgress.learnedIds);
+        setAnswers(emptyProgress.answers);
+        setCompletedLessons(emptyProgress.completedLessons);
+        setCompletedLessonDetails(emptyProgress.completedLessonDetails ?? {});
+        setSelectedLessonId(emptyProgress.selectedLessonId ?? 1);
+        if (!cancelled) setProgressLoaded(true);
+        return;
+      }
+
+      const snapshot = await getDoc(doc(db, "users", userId, "progress", "toeicStarter"));
+      const parsed = snapshot.exists() ? (snapshot.data() as UserProgress) : createEmptyProgress();
+      if (cancelled) return;
+
       setLearnedIds(parsed.learnedIds ?? []);
       setAnswers(parsed.answers ?? {});
       setCompletedLessons(parsed.completedLessons ?? []);
-    } catch {
-      window.localStorage.removeItem("toeic-progress");
+      setCompletedLessonDetails(parsed.completedLessonDetails ?? {});
+      setSelectedLessonId(parsed.selectedLessonId ?? 1);
+      if (!cancelled) setProgressLoaded(true);
     }
-  }, []);
+
+    loadProgress().catch(() => {
+      if (!cancelled) setProgressLoaded(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   useEffect(() => {
-    window.localStorage.setItem("toeic-progress", JSON.stringify({ learnedIds, answers, completedLessons }));
-  }, [learnedIds, answers, completedLessons]);
+    if (!progressLoaded || !userId) return;
+    const progress: UserProgress = {
+      learnedIds,
+      answers,
+      completedLessons,
+      completedLessonDetails,
+      selectedLessonId,
+      updatedAt: new Date().toISOString()
+    };
+
+    setProgressStatus("saving");
+    setDoc(doc(db, "users", userId, "progress", "toeicStarter"), progress, { merge: true })
+      .then(() => setProgressStatus("saved"))
+      .catch(() => setProgressStatus("error"));
+  }, [learnedIds, answers, completedLessons, completedLessonDetails, selectedLessonId, progressLoaded, userId]);
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
@@ -191,6 +254,10 @@ export default function StudyApp({ initialData }: { initialData: ToeicData }) {
   const lessons = useMemo(() => buildStudyLessons(initialData), [initialData]);
   const selectedLesson = lessons.find((lesson) => lesson.id === selectedLessonId) ?? lessons[0];
   const completedLessonSet = useMemo(() => new Set(completedLessons), [completedLessons]);
+  const completedPercent = lessons.length > 0 ? Math.round((completedLessons.length / lessons.length) * 100) : 0;
+  const wordPercent = initialData.vocabulary.length > 0 ? Math.round((learnedIds.length / initialData.vocabulary.length) * 100) : 0;
+  const nextLesson = lessons.find((lesson) => !completedLessonSet.has(lesson.id)) ?? lessons[lessons.length - 1];
+  const selectedLessonLearnedCount = selectedLesson?.vocabulary.filter((item) => learnedSet.has(item.id)).length ?? 0;
   const lessonQuiz = useMemo(
     () => buildLearnedQuiz(selectedLesson?.vocabulary ?? [], initialData.vocabulary, quizSeed),
     [selectedLesson, initialData.vocabulary, quizSeed]
@@ -206,8 +273,33 @@ export default function StudyApp({ initialData }: { initialData: ToeicData }) {
     setLearnedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
   }
 
-  function completeLesson(lesson: StudyLesson) {
-    setCompletedLessons((current) => (current.includes(lesson.id) ? current : [...current, lesson.id]));
+  function toggleCompleteLesson(lesson: StudyLesson) {
+    const isCompleted = completedLessons.includes(lesson.id);
+    if (isCompleted) {
+      setCompletedLessons((current) => current.filter((item) => item !== lesson.id));
+      setCompletedLessonDetails((current) => {
+        const next = { ...current };
+        delete next[String(lesson.id)];
+        return next;
+      });
+      return;
+    }
+
+    const quiz = buildLearnedQuiz(lesson.vocabulary, initialData.vocabulary, quizSeed);
+    const quizScore = quiz.reduce((total, item) => total + (answers[`lesson-${item.id}`] === item.answer ? 1 : 0), 0);
+    const learnedWords = lesson.vocabulary.filter((item) => learnedSet.has(item.id)).length;
+
+    setCompletedLessons((current) => (current.includes(lesson.id) ? current : [...current, lesson.id].sort((a, b) => a - b)));
+    setCompletedLessonDetails((current) => ({
+      ...current,
+      [lesson.id]: {
+        completedAt: new Date().toISOString(),
+        quizScore,
+        quizTotal: quiz.length,
+        learnedWords: Math.max(learnedWords, lesson.vocabulary.length),
+        totalWords: lesson.vocabulary.length
+      }
+    }));
     setLearnedIds((current) => Array.from(new Set([...current, ...lesson.vocabulary.map((item) => item.id)])));
   }
 
@@ -223,7 +315,7 @@ export default function StudyApp({ initialData }: { initialData: ToeicData }) {
           sizes="100vw"
         />
         <div className="hero-content">
-          <p className="eyebrow">TOEIC Starter</p>
+          <p className="eyebrow">{username ? `TOEIC Starter · ${username}` : "TOEIC Starter"}</p>
           <h1>Hoc TOEIC tu con so 0 tren dien thoai</h1>
           <p className="hero-copy">
             Tu vung, thi co ban, mau cau cong viec va giao tiep hang ngay duoc gom thanh cac phan
@@ -243,11 +335,25 @@ export default function StudyApp({ initialData }: { initialData: ToeicData }) {
       <section className="section stats" aria-label="Thong ke noi dung">
         <Stat value={initialData.stats.words} label="tu vung TOEIC" />
         <Stat value={learnedIds.length} label="tu da hoc" />
-        <Stat value={initialData.stats.grammar} label="chu diem ngu phap" />
-        <Stat value={initialData.stats.sentences} label="mau cau ung dung" />
+        <Stat value={completedLessons.length} label="bai da hoan thanh" />
+        <Stat value={completedPercent} label="% lo trinh" />
       </section>
 
       <section className="section" id="learn">
+        <ProgressDashboard
+          completedLessons={completedLessons.length}
+          completedPercent={completedPercent}
+          nextLesson={nextLesson}
+          progressLoaded={progressLoaded}
+          progressStatus={progressStatus}
+          totalLessons={lessons.length}
+          userId={userId}
+          username={username}
+          wordPercent={wordPercent}
+          wordsLearned={learnedIds.length}
+          wordsTotal={initialData.vocabulary.length}
+        />
+
         <div className="section-title">
           <div>
             <h2>Hoc theo lo trinh</h2>
@@ -269,8 +375,9 @@ export default function StudyApp({ initialData }: { initialData: ToeicData }) {
                     onClick={() => setSelectedLessonId(lesson.id)}
                     type="button"
                   >
-                    <span>Ngay {lesson.id}</span>
+                    <span>Ngay {lesson.id} · {getLessonLearnedCount(lesson, learnedSet)}/{lesson.vocabulary.length} tu</span>
                     <strong>{lesson.title}</strong>
+                    {done ? <small>{formatCompletionDate(completedLessonDetails[String(lesson.id)]?.completedAt)}</small> : null}
                   </button>
                 );
               })}
@@ -281,10 +388,12 @@ export default function StudyApp({ initialData }: { initialData: ToeicData }) {
               completed={completedLessonSet.has(selectedLesson.id)}
               quiz={lessonQuiz}
               quizScore={lessonScore}
+              savedCompletion={completedLessonDetails[String(selectedLesson.id)]}
+              selectedLessonLearnedCount={selectedLessonLearnedCount}
               answers={answers}
               sentencePatterns={initialData.sentencePatterns ?? []}
               onToggleLearned={toggleLearned}
-              onCompleteLesson={completeLesson}
+              onCompleteLesson={toggleCompleteLesson}
               onAnswer={(key, option) => setAnswers((current) => ({ ...current, [key]: option }))}
               onShuffleQuiz={() => setQuizSeed((current) => current + 1)}
             />
@@ -312,6 +421,8 @@ function LessonView({
   completed,
   quiz,
   quizScore,
+  savedCompletion,
+  selectedLessonLearnedCount,
   answers,
   sentencePatterns,
   onToggleLearned,
@@ -324,6 +435,8 @@ function LessonView({
   completed: boolean;
   quiz: Quiz[];
   quizScore: number;
+  savedCompletion?: LessonCompletion;
+  selectedLessonLearnedCount: number;
   answers: Record<string, string>;
   sentencePatterns: SentencePattern[];
   onToggleLearned: (id: number) => void;
@@ -348,9 +461,14 @@ function LessonView({
           <p className="eyebrow lesson-day">Ngay {lesson.id}</p>
           <h3>{lesson.title}</h3>
           <p>{lesson.tasks.join(" ")}</p>
+          <div className="lesson-progress-line">
+            <span>{selectedLessonLearnedCount}/{lesson.vocabulary.length} tu da hoc</span>
+            <span>Quiz {quizScore}/{quiz.length}</span>
+            {savedCompletion ? <span>Hoan thanh {formatCompletionDate(savedCompletion.completedAt)}</span> : null}
+          </div>
         </div>
         <button className="primary-action compact-action" onClick={() => onCompleteLesson(lesson)} type="button">
-          {completed ? "Da hoan thanh" : "Hoan thanh"}
+          {completed ? "Bo hoan thanh" : "Hoan thanh"}
         </button>
       </div>
 
@@ -565,6 +683,75 @@ function LessonView({
           ))}
         </div>
       </section>
+    </div>
+  );
+}
+
+function ProgressDashboard({
+  userId,
+  username,
+  progressLoaded,
+  progressStatus,
+  completedLessons,
+  totalLessons,
+  completedPercent,
+  wordsLearned,
+  wordsTotal,
+  wordPercent,
+  nextLesson
+}: {
+  userId?: string | null;
+  username?: string | null;
+  progressLoaded: boolean;
+  progressStatus: "idle" | "saving" | "saved" | "error";
+  completedLessons: number;
+  totalLessons: number;
+  completedPercent: number;
+  wordsLearned: number;
+  wordsTotal: number;
+  wordPercent: number;
+  nextLesson?: StudyLesson;
+}) {
+  const syncText = !userId
+    ? "Dang hoc thu, hay dang nhap de luu tien do"
+    : !progressLoaded
+      ? "Dang tai tien do"
+      : progressStatus === "saving"
+        ? "Dang dong bo Firebase"
+        : progressStatus === "error"
+          ? "Chua dong bo duoc"
+          : "Da dong bo Firebase";
+
+  return (
+    <section className="progress-dashboard" aria-label="Tien do ca nhan">
+      <div className="progress-dashboard-copy">
+        <p className="eyebrow">Tien do ca nhan</p>
+        <h2>{username ? `Xin chao, ${username}` : "Quan ly lo trinh hoc cua ban"}</h2>
+        <p>
+          {nextLesson
+            ? `Bai tiep theo: Ngay ${nextLesson.id} - ${nextLesson.title}.`
+            : "Ban da hoan thanh tat ca bai hoc trong lo trinh."}
+        </p>
+      </div>
+      <div className="progress-meter-list">
+        <ProgressMeter label="Lo trinh" value={completedPercent} detail={`${completedLessons}/${totalLessons} bai`} />
+        <ProgressMeter label="Tu vung" value={wordPercent} detail={`${wordsLearned}/${wordsTotal} tu`} />
+      </div>
+      <div className={`sync-state ${progressStatus === "error" ? "error" : ""}`}>{syncText}</div>
+    </section>
+  );
+}
+
+function ProgressMeter({ label, value, detail }: { label: string; value: number; detail: string }) {
+  return (
+    <div className="progress-meter">
+      <div>
+        <strong>{label}</strong>
+        <span>{detail}</span>
+      </div>
+      <div className="progress-track" aria-label={`${label} ${value}%`}>
+        <span style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+      </div>
     </div>
   );
 }
@@ -1031,4 +1218,31 @@ function shuffleItems<T>(items: T[], seed: number): T[] {
     })
     .sort((a, b) => a.sortKey - b.sortKey)
     .map(({ item }) => item);
+}
+
+function getLessonLearnedCount(lesson: StudyLesson, learnedSet: Set<number>) {
+  return lesson.vocabulary.filter((item) => learnedSet.has(item.id)).length;
+}
+
+function formatCompletionDate(value?: string) {
+  if (!value) return "da luu";
+
+  try {
+    return new Intl.DateTimeFormat("vi-VN", {
+      day: "2-digit",
+      month: "2-digit"
+    }).format(new Date(value));
+  } catch {
+    return "da luu";
+  }
+}
+
+function createEmptyProgress(): UserProgress {
+  return {
+    learnedIds: [],
+    answers: {},
+    completedLessons: [],
+    completedLessonDetails: {},
+    selectedLessonId: 1
+  };
 }

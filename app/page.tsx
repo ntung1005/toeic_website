@@ -1,6 +1,6 @@
-import StudyApp from "@/components/StudyApp";
+import FirebaseDataProvider from "@/components/FirebaseDataProvider";
 import db from "@/data/toeic-starter.json";
 
 export default function Home() {
-  return <StudyApp initialData={db} />;
+  return <FirebaseDataProvider initialData={db} />;
 }
