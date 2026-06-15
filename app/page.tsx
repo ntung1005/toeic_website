@@ -1,6 +1,5 @@
-import FirebaseDataProvider from "@/components/FirebaseDataProvider";
-import db from "@/data/toeic-starter.json";
+import CourseCatalog from "@/components/CourseCatalog";
 
 export default function Home() {
-  return <FirebaseDataProvider initialData={db} />;
+  return <CourseCatalog />;
 }
