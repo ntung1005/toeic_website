@@ -359,18 +359,17 @@ export default function StudyApp({
 
   useEffect(() => {
     if (!progressLoaded || !userId || loadedUserId !== userId) return;
-    const progress: UserProgress = {
+    const progress = createProgressPayload({
+      userId,
       learnedIds,
       answers,
       completedLessons,
       completedLessonDetails,
-      selectedLessonId,
-      ownerId: userId,
-      updatedAt: new Date().toISOString()
-    };
+      selectedLessonId
+    });
 
     setProgressStatus("saving");
-    setDoc(doc(db, "users", userId, "progress", "toeicStarter"), progress, { merge: true })
+    persistUserProgress(userId, progress)
       .then(() => setProgressStatus("saved"))
       .catch(() => setProgressStatus("error"));
   }, [learnedIds, answers, completedLessons, completedLessonDetails, selectedLessonId, progressLoaded, loadedUserId, userId]);
@@ -437,14 +436,22 @@ export default function StudyApp({
   }
 
   function toggleCompleteLesson(lesson: StudyLesson) {
-    if (!canSaveProgress(userId, progressLoaded, loadedUserId)) return;
+    if (!userId || !canSaveProgress(userId, progressLoaded, loadedUserId)) return;
     const isCompleted = completedLessons.includes(lesson.id);
     if (isCompleted) {
-      setCompletedLessons((current) => current.filter((item) => item !== lesson.id));
-      setCompletedLessonDetails((current) => {
-        const next = { ...current };
-        delete next[String(lesson.id)];
-        return next;
+      const nextCompletedLessons = completedLessons.filter((item) => item !== lesson.id);
+      const nextDetails = { ...completedLessonDetails };
+      delete nextDetails[String(lesson.id)];
+
+      setCompletedLessons(nextCompletedLessons);
+      setCompletedLessonDetails(nextDetails);
+      saveProgressNow({
+        userId,
+        learnedIds,
+        answers,
+        completedLessons: nextCompletedLessons,
+        completedLessonDetails: nextDetails,
+        selectedLessonId
       });
       return;
     }
@@ -452,10 +459,10 @@ export default function StudyApp({
     const quiz = buildLearnedQuiz(lesson.vocabulary, initialData.vocabulary, quizSeed);
     const quizScore = quiz.reduce((total, item) => total + (answers[`lesson-${item.id}`] === item.answer ? 1 : 0), 0);
     const learnedWords = lesson.vocabulary.filter((item) => learnedSet.has(item.id)).length;
-
-    setCompletedLessons((current) => (current.includes(lesson.id) ? current : [...current, lesson.id].sort((a, b) => a - b)));
-    setCompletedLessonDetails((current) => ({
-      ...current,
+    const nextLearnedIds = Array.from(new Set([...learnedIds, ...lesson.vocabulary.map((item) => item.id)]));
+    const nextCompletedLessons = completedLessons.includes(lesson.id) ? completedLessons : [...completedLessons, lesson.id].sort((a, b) => a - b);
+    const nextDetails = {
+      ...completedLessonDetails,
       [lesson.id]: {
         completedAt: new Date().toISOString(),
         quizScore,
@@ -463,8 +470,27 @@ export default function StudyApp({
         learnedWords: Math.max(learnedWords, lesson.vocabulary.length),
         totalWords: lesson.vocabulary.length
       }
-    }));
-    setLearnedIds((current) => Array.from(new Set([...current, ...lesson.vocabulary.map((item) => item.id)])));
+    };
+
+    setCompletedLessons(nextCompletedLessons);
+    setCompletedLessonDetails(nextDetails);
+    setLearnedIds(nextLearnedIds);
+    saveProgressNow({
+      userId,
+      learnedIds: nextLearnedIds,
+      answers,
+      completedLessons: nextCompletedLessons,
+      completedLessonDetails: nextDetails,
+      selectedLessonId
+    });
+  }
+
+  function saveProgressNow(progressInput: Omit<UserProgress, "ownerId" | "updatedAt"> & { userId: string }) {
+    const progress = createProgressPayload(progressInput);
+    setProgressStatus("saving");
+    persistUserProgress(progressInput.userId, progress)
+      .then(() => setProgressStatus("saved"))
+      .catch(() => setProgressStatus("error"));
   }
 
   return (
@@ -1626,6 +1652,29 @@ function formatCompletionDate(value?: string) {
 
 function canSaveProgress(userId: string | null | undefined, progressLoaded: boolean, loadedUserId: string | null) {
   return Boolean(userId && progressLoaded && loadedUserId === userId);
+}
+
+function createProgressPayload({
+  userId,
+  learnedIds,
+  answers,
+  completedLessons,
+  completedLessonDetails,
+  selectedLessonId
+}: Omit<UserProgress, "ownerId" | "updatedAt"> & { userId: string }): UserProgress {
+  return {
+    learnedIds,
+    answers,
+    completedLessons,
+    completedLessonDetails: completedLessonDetails ?? {},
+    selectedLessonId,
+    ownerId: userId,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function persistUserProgress(userId: string, progress: UserProgress) {
+  return setDoc(doc(db, "users", userId, "progress", "toeicStarter"), progress);
 }
 
 function createEmptyProgress(): UserProgress {
