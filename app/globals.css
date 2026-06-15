@@ -32,6 +32,10 @@ input {
   font: inherit;
 }
 
+a {
+  color: inherit;
+}
+
 button {
   cursor: pointer;
 }
@@ -68,6 +72,12 @@ button {
 .auth-copy {
   display: grid;
   gap: 2px;
+  min-width: 0;
+}
+
+.auth-copy strong,
+.auth-copy span {
+  overflow-wrap: anywhere;
 }
 
 .auth-copy span {
@@ -188,6 +198,7 @@ button {
 
 .auth-panel {
   width: min(460px, 100%);
+  max-width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-strong);
@@ -208,8 +219,9 @@ button {
 .auth-panel h1 {
   max-width: none;
   color: var(--ink);
-  font-size: clamp(2rem, 8vw, 3rem);
-  line-height: 1.02;
+  font-size: clamp(1.85rem, 7vw, 2.8rem);
+  line-height: 1.08;
+  overflow-wrap: anywhere;
 }
 
 .auth-page-copy {
@@ -247,6 +259,14 @@ button {
 
 .auth-logout-panel {
   text-align: center;
+}
+
+.auth-gate-panel {
+  text-align: center;
+}
+
+.auth-gate-panel h1 {
+  font-size: clamp(1.8rem, 7vw, 2.45rem);
 }
 
 .hero {
@@ -556,7 +576,8 @@ h1 {
 .conversation,
 .fill-list,
 .passage-fill,
-.passage-blank-list {
+.passage-blank-list,
+.tests-panel {
   display: grid;
   gap: 10px;
 }
@@ -592,10 +613,18 @@ h1 {
   padding: 5px 9px;
 }
 
+.progress-lock-note {
+  margin: 10px 0 0;
+  color: #9d3f2e;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
 .lesson-section,
 .item-card,
 .quiz-card,
-.fill-card {
+.fill-card,
+.test-card {
   padding: 14px;
 }
 
@@ -609,10 +638,58 @@ h1 {
 
 .lesson-vocab-grid,
 .tense-grid,
-.quiz-list {
+.quiz-list,
+.test-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
+}
+
+.test-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 10px;
+}
+
+.test-meta {
+  display: grid;
+  gap: 8px;
+  margin: 2px 0 0;
+}
+
+.test-meta div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.test-meta dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.test-meta dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.official-tag {
+  background: #fff3d5;
+  color: #765119;
+}
+
+.test-link {
+  width: 100%;
+  margin-top: 2px;
 }
 
 .item-top {
@@ -680,6 +757,14 @@ h1 {
 .learned-card .learn-toggle {
   background: var(--teal);
   color: white;
+}
+
+.learn-toggle:disabled,
+.primary-action:disabled,
+.topic-pill:disabled,
+.option:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .meaning {
@@ -776,7 +861,7 @@ h1 {
   bottom: 0;
   z-index: 5;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   padding: 10px max(10px, env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-right));
   background: rgba(255, 253, 247, 0.94);
@@ -834,7 +919,8 @@ h1 {
   }
 
   .lesson-vocab-grid,
-  .tense-grid {
+  .tense-grid,
+  .test-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
@@ -844,6 +930,11 @@ h1 {
 }
 
 @media (max-width: 640px) {
+  .auth-page {
+    align-items: start;
+    padding: 18px 14px;
+  }
+
   .auth-card,
   .auth-signed-in,
   .auth-guest {
@@ -852,8 +943,13 @@ h1 {
   }
 
   .auth-signed-in {
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
+  }
+
+  .auth-signed-in .auth-submit {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .auth-actions {
@@ -862,7 +958,11 @@ h1 {
   }
 
   .auth-panel {
-    padding: 22px;
+    padding: 22px 18px;
+  }
+
+  .auth-panel h1 {
+    font-size: clamp(1.65rem, 9vw, 2.25rem);
   }
 
   .hero-actions {

@@ -71,6 +71,21 @@ type MeaningExercise = {
   options: string[];
 };
 
+type ReverseMeaningExercise = {
+  id: number;
+  meaning: string;
+  answer: string;
+  options: string[];
+};
+
+type SentenceChoiceExercise = {
+  id: number;
+  prompt: string;
+  answer: string;
+  options: string[];
+  explanation: string;
+};
+
 type PassageBlank = {
   id: number;
   answer: string;
@@ -92,6 +107,21 @@ type StudyLesson = {
   reading?: ReadingPassage;
   conversation?: Conversation;
   tasks: string[];
+};
+
+type StudyMode = "roadmap" | "tenses" | "tests";
+
+type PracticeTestResource = {
+  id: string;
+  title: string;
+  provider: string;
+  sourceType: "official" | "practice" | "skill";
+  format: string;
+  duration: string;
+  level: string;
+  parts: string[];
+  description: string;
+  url: string;
 };
 
 type ToeicData = {
@@ -125,7 +155,119 @@ const tabs: { id: Tab; label: string }[] = [
   { id: "plan", label: "Lo trinh" }
 ];
 
+const TOEIC_PRACTICE_TESTS: PracticeTestResource[] = [
+  {
+    id: "ets-sample-lr",
+    title: "TOEIC Listening & Reading Sample Test",
+    provider: "ETS",
+    sourceType: "official",
+    format: "PDF sample",
+    duration: "Luyen theo tung phan",
+    level: "Beginner - Intermediate",
+    parts: ["Listening", "Reading", "Answer key"],
+    description: "Tai lieu mau chinh thuc de lam quen cau truc bai thi TOEIC Listening & Reading.",
+    url: "https://www.ca.ets.org/pdfs/toeic/toeic-listening-reading-sample-test.pdf"
+  },
+  {
+    id: "ets-prepare",
+    title: "TOEIC Test Preparation Materials",
+    provider: "ETS",
+    sourceType: "official",
+    format: "Handbook / Sample materials",
+    duration: "Tu hoc linh hoat",
+    level: "All levels",
+    parts: ["Format", "Sample tests", "Preparation"],
+    description: "Trang tong hop tai lieu luyen thi TOEIC chinh thuc tu ETS.",
+    url: "https://www.ets.org/toeic/test-takers/prepare.html"
+  },
+  {
+    id: "iibc-format",
+    title: "TOEIC L&R Test Format and Content",
+    provider: "IIBC",
+    sourceType: "official",
+    format: "Format guide",
+    duration: "2 gio format that",
+    level: "All levels",
+    parts: ["Part 1-7", "Timing", "Question count"],
+    description: "Mo ta cau truc 200 cau trong 2 gio, gom 100 Listening va 100 Reading.",
+    url: "https://www.iibc-global.org/english/toeic/test/lr/about/format.html"
+  },
+  {
+    id: "toeic-hk-download",
+    title: "TOEIC Download Zone",
+    provider: "TOEIC Hong Kong",
+    sourceType: "official",
+    format: "PDF / Audio tracks",
+    duration: "Luyen sample test",
+    level: "Beginner - Intermediate",
+    parts: ["Listening", "Reading", "Speaking", "Writing", "Audio"],
+    description: "Khu tai ve sample test paper va audio track cong khai cho TOEIC.",
+    url: "https://www.toeic.com.hk/index/showarticle/itpdownload/en"
+  },
+  {
+    id: "ets-global-projector",
+    title: "TOEIC Test Level Projector",
+    provider: "ETS Global",
+    sourceType: "official",
+    format: "Online listening placement",
+    duration: "15 phut",
+    level: "A1 - C1",
+    parts: ["Listening", "Level estimate"],
+    description: "Cong cu online mien phi voi 25 cau Listening de uoc tinh trinh do hien tai.",
+    url: "https://www.etsglobal.org/cm/en/practice-test/toeic-level-projector"
+  },
+  {
+    id: "4tests-toeic",
+    title: "Free TOEIC Practice Exam",
+    provider: "4Tests",
+    sourceType: "practice",
+    format: "Online practice",
+    duration: "Theo part tuy chon",
+    level: "Beginner - Intermediate",
+    parts: ["Photographs", "Question-Response", "Conversations", "Short Talks", "Reading"],
+    description: "Bai luyen online chia theo cac section TOEIC de lam quen dang cau hoi.",
+    url: "https://www.4tests.com/toeic"
+  },
+  {
+    id: "englishclub-toeic",
+    title: "TOEIC Practice Sessions",
+    provider: "EnglishClub",
+    sourceType: "practice",
+    format: "Part-by-part practice",
+    duration: "Luyen ngan moi part",
+    level: "Beginner - Intermediate",
+    parts: ["Listening", "Reading", "Speaking", "Writing"],
+    description: "Nguon luyen tung dang cau hoi TOEIC kem giai thich de on theo part.",
+    url: "https://www.englishclub.com/esl-exams/ets-toeic-practice.php"
+  },
+  {
+    id: "british-council-listening",
+    title: "Listening Practice",
+    provider: "British Council LearnEnglish",
+    sourceType: "skill",
+    format: "Listening activities",
+    duration: "5-20 phut/bai",
+    level: "A1 - B2",
+    parts: ["Listening foundation"],
+    description: "Nguon luyen nghe nen tang phu hop nguoi moi bat dau truoc khi lam full TOEIC.",
+    url: "https://learnenglish.britishcouncil.org/free-resources/listening"
+  },
+  {
+    id: "toeic-test-pro",
+    title: "TOEIC Test Pro",
+    provider: "Estudyme",
+    sourceType: "practice",
+    format: "Online mock tests",
+    duration: "Part practice / Mock test",
+    level: "Beginner - Advanced",
+    parts: ["Listening", "Reading", "Vocabulary", "Grammar"],
+    description: "Nen tang luyen de online co chia part, mock test va bai tap tu vung/ngu phap.",
+    url: "https://estudyme.com/en/toeic-testpro/"
+  }
+];
+
 type UserProgress = {
+  ownerId?: string;
   learnedIds: number[];
   answers: Record<string, string>;
   completedLessons: number[];
@@ -153,7 +295,7 @@ export default function StudyApp({
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("vocabulary");
   const [topic, setTopic] = useState("all");
-  const [studyMode, setStudyMode] = useState<"roadmap" | "tenses">("roadmap");
+  const [studyMode, setStudyMode] = useState<StudyMode>("roadmap");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [learnedIds, setLearnedIds] = useState<number[]>([]);
   const [completedLessons, setCompletedLessons] = useState<number[]>([]);
@@ -161,6 +303,7 @@ export default function StudyApp({
   const [selectedLessonId, setSelectedLessonId] = useState(1);
   const [quizSeed, setQuizSeed] = useState(1);
   const [progressLoaded, setProgressLoaded] = useState(false);
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
   const [progressStatus, setProgressStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   useEffect(() => {
@@ -168,6 +311,8 @@ export default function StudyApp({
 
     async function loadProgress() {
       setProgressLoaded(false);
+      setLoadedUserId(null);
+      setProgressStatus("idle");
 
       if (!userId) {
         const emptyProgress = createEmptyProgress();
@@ -176,7 +321,10 @@ export default function StudyApp({
         setCompletedLessons(emptyProgress.completedLessons);
         setCompletedLessonDetails(emptyProgress.completedLessonDetails ?? {});
         setSelectedLessonId(emptyProgress.selectedLessonId ?? 1);
-        if (!cancelled) setProgressLoaded(true);
+        if (!cancelled) {
+          setProgressLoaded(true);
+          setLoadedUserId(null);
+        }
         return;
       }
 
@@ -189,11 +337,19 @@ export default function StudyApp({
       setCompletedLessons(parsed.completedLessons ?? []);
       setCompletedLessonDetails(parsed.completedLessonDetails ?? {});
       setSelectedLessonId(parsed.selectedLessonId ?? 1);
-      if (!cancelled) setProgressLoaded(true);
+      if (!cancelled) {
+        setProgressLoaded(true);
+        setLoadedUserId(userId);
+        setProgressStatus("saved");
+      }
     }
 
     loadProgress().catch(() => {
-      if (!cancelled) setProgressLoaded(true);
+      if (!cancelled) {
+        setProgressLoaded(false);
+        setLoadedUserId(null);
+        setProgressStatus("error");
+      }
     });
 
     return () => {
@@ -202,13 +358,14 @@ export default function StudyApp({
   }, [userId]);
 
   useEffect(() => {
-    if (!progressLoaded || !userId) return;
+    if (!progressLoaded || !userId || loadedUserId !== userId) return;
     const progress: UserProgress = {
       learnedIds,
       answers,
       completedLessons,
       completedLessonDetails,
       selectedLessonId,
+      ownerId: userId,
       updatedAt: new Date().toISOString()
     };
 
@@ -216,7 +373,7 @@ export default function StudyApp({
     setDoc(doc(db, "users", userId, "progress", "toeicStarter"), progress, { merge: true })
       .then(() => setProgressStatus("saved"))
       .catch(() => setProgressStatus("error"));
-  }, [learnedIds, answers, completedLessons, completedLessonDetails, selectedLessonId, progressLoaded, userId]);
+  }, [learnedIds, answers, completedLessons, completedLessonDetails, selectedLessonId, progressLoaded, loadedUserId, userId]);
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
@@ -270,10 +427,17 @@ export default function StudyApp({
   }, 0);
 
   function toggleLearned(id: number) {
+    if (!canSaveProgress(userId, progressLoaded, loadedUserId)) return;
     setLearnedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
   }
 
+  function answerExercise(key: string, option: string) {
+    if (!canSaveProgress(userId, progressLoaded, loadedUserId)) return;
+    setAnswers((current) => ({ ...current, [key]: option }));
+  }
+
   function toggleCompleteLesson(lesson: StudyLesson) {
+    if (!canSaveProgress(userId, progressLoaded, loadedUserId)) return;
     const isCompleted = completedLessons.includes(lesson.id);
     if (isCompleted) {
       setCompletedLessons((current) => current.filter((item) => item !== lesson.id));
@@ -327,6 +491,9 @@ export default function StudyApp({
             </a>
             <a className="secondary-action" href="#learn" onClick={() => setStudyMode("tenses")}>
               Hoc cac thi
+            </a>
+            <a className="secondary-action" href="#learn" onClick={() => setStudyMode("tests")}>
+              Luyen de
             </a>
           </div>
         </div>
@@ -390,16 +557,19 @@ export default function StudyApp({
               quizScore={lessonScore}
               savedCompletion={completedLessonDetails[String(selectedLesson.id)]}
               selectedLessonLearnedCount={selectedLessonLearnedCount}
+              progressLocked={!canSaveProgress(userId, progressLoaded, loadedUserId)}
               answers={answers}
               sentencePatterns={initialData.sentencePatterns ?? []}
               onToggleLearned={toggleLearned}
               onCompleteLesson={toggleCompleteLesson}
-              onAnswer={(key, option) => setAnswers((current) => ({ ...current, [key]: option }))}
+              onAnswer={answerExercise}
               onShuffleQuiz={() => setQuizSeed((current) => current + 1)}
             />
           </div>
-        ) : (
+        ) : studyMode === "tenses" ? (
           <TenseStudy grammar={initialData.grammar} />
+        ) : (
+          <PracticeTestsTab tests={TOEIC_PRACTICE_TESTS} />
         )}
       </section>
 
@@ -409,6 +579,9 @@ export default function StudyApp({
         </a>
         <a className={studyMode === "tenses" ? "active" : ""} href="#learn" onClick={() => setStudyMode("tenses")}>
           Cac thi
+        </a>
+        <a className={studyMode === "tests" ? "active" : ""} href="#learn" onClick={() => setStudyMode("tests")}>
+          De thi
         </a>
       </nav>
     </main>
@@ -423,6 +596,7 @@ function LessonView({
   quizScore,
   savedCompletion,
   selectedLessonLearnedCount,
+  progressLocked,
   answers,
   sentencePatterns,
   onToggleLearned,
@@ -437,6 +611,7 @@ function LessonView({
   quizScore: number;
   savedCompletion?: LessonCompletion;
   selectedLessonLearnedCount: number;
+  progressLocked: boolean;
   answers: Record<string, string>;
   sentencePatterns: SentencePattern[];
   onToggleLearned: (id: number) => void;
@@ -448,8 +623,18 @@ function LessonView({
   const lessonSentences = sentencePatterns.filter((item) => item.vocabularyId && lessonWordIds.has(item.vocabularyId)).slice(0, 16);
   const meaningExercises = buildMeaningExercises(lesson.vocabulary);
   const meaningScore = meaningExercises.reduce((total, item) => total + (answers[`meaning-${lesson.id}-${item.id}`] === item.answer ? 1 : 0), 0);
+  const reverseMeaningExercises = buildReverseMeaningExercises(lesson.vocabulary);
+  const reverseMeaningScore = reverseMeaningExercises.reduce(
+    (total, item) => total + (answers[`reverse-meaning-${lesson.id}-${item.id}`] === item.answer ? 1 : 0),
+    0
+  );
   const fillExercises = buildFillExercises(lesson.vocabulary);
   const fillScore = fillExercises.reduce((total, item) => total + (answers[`fill-${lesson.id}-${item.id}`] === item.answer ? 1 : 0), 0);
+  const sentenceChoiceExercises = buildSentenceChoiceExercises(lesson.vocabulary, lessonSentences);
+  const sentenceChoiceScore = sentenceChoiceExercises.reduce(
+    (total, item) => total + (answers[`sentence-choice-${lesson.id}-${item.id}`] === item.answer ? 1 : 0),
+    0
+  );
   const passageFill = lesson.reading ? buildPassageFillExercise(lesson.reading, lesson.vocabulary) : null;
   const passageFillScore =
     passageFill?.blanks.reduce((total, item) => total + (answers[`passage-fill-${lesson.id}-${item.id}`] === item.answer ? 1 : 0), 0) ?? 0;
@@ -466,8 +651,9 @@ function LessonView({
             <span>Quiz {quizScore}/{quiz.length}</span>
             {savedCompletion ? <span>Hoan thanh {formatCompletionDate(savedCompletion.completedAt)}</span> : null}
           </div>
+          {progressLocked ? <p className="progress-lock-note">Dang nhap de luu trang thai hoan thanh cho rieng tai khoan cua ban.</p> : null}
         </div>
-        <button className="primary-action compact-action" onClick={() => onCompleteLesson(lesson)} type="button">
+        <button className="primary-action compact-action" disabled={progressLocked} onClick={() => onCompleteLesson(lesson)} type="button">
           {completed ? "Bo hoan thanh" : "Hoan thanh"}
         </button>
       </div>
@@ -482,7 +668,7 @@ function LessonView({
             <article className={`item-card ${learnedSet.has(item.id) ? "learned-card" : ""}`} key={item.id}>
               <div className="item-top">
                 <h3 className="term">{item.term}</h3>
-                <button className="learn-toggle" onClick={() => onToggleLearned(item.id)} type="button">
+                <button className="learn-toggle" disabled={progressLocked} onClick={() => onToggleLearned(item.id)} type="button">
                   {learnedSet.has(item.id) ? "Da hoc" : "Danh dau"}
                 </button>
               </div>
@@ -516,6 +702,7 @@ function LessonView({
                   return (
                     <button
                       className={className}
+                      disabled={progressLocked}
                       key={option}
                       onClick={() => onAnswer(`meaning-${lesson.id}-${item.id}`, option)}
                       type="button"
@@ -550,7 +737,44 @@ function LessonView({
 
       <section className="lesson-section">
         <div className="lesson-section-title">
-          <h3>4. Dien tu theo nghia</h3>
+          <h3>4. Chon tu theo nghia Viet</h3>
+          <span className="tag">
+            {reverseMeaningScore}/{reverseMeaningExercises.length}
+          </span>
+        </div>
+        <div className="fill-list">
+          {reverseMeaningExercises.map((item) => (
+            <article className="fill-card" key={item.id}>
+              <p className="meaning">{item.meaning}</p>
+              <div className="fill-options">
+                {item.options.map((option) => {
+                  const picked = answers[`reverse-meaning-${lesson.id}-${item.id}`];
+                  const className =
+                    picked === option ? `topic-pill ${option === item.answer ? "correct-pill" : "wrong-pill"}` : "topic-pill";
+                  return (
+                    <button
+                      className={className}
+                      disabled={progressLocked}
+                      key={option}
+                      onClick={() => onAnswer(`reverse-meaning-${lesson.id}-${item.id}`, option)}
+                      type="button"
+                    >
+                      {option}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="explain">
+                {answers[`reverse-meaning-${lesson.id}-${item.id}`] ? `Tu dung: ${item.answer}` : "Chon tu tieng Anh dung voi nghia."}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="lesson-section">
+        <div className="lesson-section-title">
+          <h3>5. Dien tu theo ngu canh</h3>
           <span className="tag">
             {fillScore}/{fillExercises.length}
           </span>
@@ -568,6 +792,7 @@ function LessonView({
                   return (
                     <button
                       className={className}
+                      disabled={progressLocked}
                       key={option}
                       onClick={() => onAnswer(`fill-${lesson.id}-${item.id}`, option)}
                       type="button"
@@ -588,7 +813,7 @@ function LessonView({
       {lesson.conversation ? (
         <section className="lesson-section">
           <div className="lesson-section-title">
-            <h3>5. Hoi thoai ung dung</h3>
+            <h3>6. Hoi thoai ung dung</h3>
             <span className="tag">{lesson.conversation.topic}</span>
           </div>
           <div className="conversation">
@@ -604,7 +829,7 @@ function LessonView({
       {lesson.reading ? (
         <section className="lesson-section">
           <div className="lesson-section-title">
-            <h3>6. Doan van on tu</h3>
+            <h3>7. Doan van on tu</h3>
             <span className="tag">{lesson.reading.wordCount} tu</span>
           </div>
           <article className="item-card">
@@ -642,6 +867,7 @@ function LessonView({
                           return (
                             <button
                               className={className}
+                              disabled={progressLocked}
                               key={option}
                               onClick={() => onAnswer(`passage-fill-${lesson.id}-${blank.id}`, option)}
                               type="button"
@@ -661,14 +887,50 @@ function LessonView({
       ) : null}
 
       <section className="lesson-section">
+        <div className="lesson-section-title">
+          <h3>8. Chon mau cau dung</h3>
+          <span className="tag">
+            {sentenceChoiceScore}/{sentenceChoiceExercises.length}
+          </span>
+        </div>
+        <div className="fill-list">
+          {sentenceChoiceExercises.map((item) => (
+            <article className="fill-card" key={item.id}>
+              <p className="meaning">{item.prompt}</p>
+              <div className="options">
+                {item.options.map((option) => {
+                  const picked = answers[`sentence-choice-${lesson.id}-${item.id}`];
+                  const className = picked === option ? `option ${option === item.answer ? "correct" : "wrong"}` : "option";
+                  return (
+                    <button
+                      className={className}
+                      disabled={progressLocked}
+                      key={option}
+                      onClick={() => onAnswer(`sentence-choice-${lesson.id}-${item.id}`, option)}
+                      type="button"
+                    >
+                      {option}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="explain">
+                {answers[`sentence-choice-${lesson.id}-${item.id}`] ? item.explanation : "Chon cau phu hop voi nghia duoc goi y."}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="lesson-section">
         <div className="quiz-toolbar">
           <div>
-            <h3>7. Quiz cua bai hoc</h3>
+            <h3>9. Quiz cua bai hoc</h3>
             <p>
               Diem hien tai: {quizScore}/{quiz.length}
             </p>
           </div>
-          <button className="primary-action compact-action" onClick={onShuffleQuiz} type="button">
+          <button className="primary-action compact-action" disabled={progressLocked} onClick={onShuffleQuiz} type="button">
             Xao tron
           </button>
         </div>
@@ -678,6 +940,7 @@ function LessonView({
               key={item.id}
               item={item}
               answer={answers[`lesson-${item.id}`]}
+              disabled={progressLocked}
               onAnswer={(option) => onAnswer(`lesson-${item.id}`, option)}
             />
           ))}
@@ -753,6 +1016,84 @@ function ProgressMeter({ label, value, detail }: { label: string; value: number;
         <span style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
       </div>
     </div>
+  );
+}
+
+function PracticeTestsTab({ tests }: { tests: PracticeTestResource[] }) {
+  const officialTests = tests.filter((item) => item.sourceType === "official");
+  const practiceTests = tests.filter((item) => item.sourceType === "practice");
+  const skillTests = tests.filter((item) => item.sourceType === "skill");
+
+  return (
+    <div className="tests-panel">
+      <div className="plan-summary tests-summary">
+        <div>
+          <p className="eyebrow">De thi TOEIC</p>
+          <h3>Nguon luyen de cong khai</h3>
+          <p>
+            Danh sach nay uu tien nguon chinh thuc va practice test cong khai. App chi listing va dieu huong, khong sao chep nguyen de co ban quyen.
+          </p>
+        </div>
+        <span className="tag">{tests.length} nguon</span>
+      </div>
+
+      <TestGroup title="Nguon chinh thuc" tests={officialTests} />
+      <TestGroup title="Mock test va luyen tung part" tests={practiceTests} />
+      <TestGroup title="Nen tang listening/reading cho nguoi moi" tests={skillTests} />
+    </div>
+  );
+}
+
+function TestGroup({ title, tests }: { title: string; tests: PracticeTestResource[] }) {
+  if (tests.length === 0) return null;
+
+  return (
+    <section className="lesson-section">
+      <div className="lesson-section-title">
+        <h3>{title}</h3>
+        <span className="tag">{tests.length} link</span>
+      </div>
+      <div className="test-grid">
+        {tests.map((item) => (
+          <article className="test-card" key={item.id}>
+            <div className="item-top">
+              <div>
+                <p className="eyebrow">{item.provider}</p>
+                <h3 className="term">{item.title}</h3>
+              </div>
+              <span className={`tag ${item.sourceType === "official" ? "official-tag" : ""}`}>
+                {item.sourceType === "official" ? "Official" : item.sourceType === "skill" ? "Skill" : "Practice"}
+              </span>
+            </div>
+            <p className="example">{item.description}</p>
+            <dl className="test-meta">
+              <div>
+                <dt>Dinh dang</dt>
+                <dd>{item.format}</dd>
+              </div>
+              <div>
+                <dt>Thoi luong</dt>
+                <dd>{item.duration}</dd>
+              </div>
+              <div>
+                <dt>Trinh do</dt>
+                <dd>{item.level}</dd>
+              </div>
+            </dl>
+            <div className="term-cloud">
+              {item.parts.map((part) => (
+                <span className="tag" key={part}>
+                  {part}
+                </span>
+              ))}
+            </div>
+            <a className="primary-action test-link" href={item.url} rel="noreferrer" target="_blank">
+              Mo de luyen
+            </a>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1066,10 +1407,12 @@ function renderMainContent({
 function QuizCard({
   item,
   answer,
+  disabled = false,
   onAnswer
 }: {
   item: Quiz;
   answer?: string;
+  disabled?: boolean;
   onAnswer: (option: string) => void;
 }) {
   return (
@@ -1080,7 +1423,7 @@ function QuizCard({
           const isPicked = answer === option;
           const className = answer && isPicked ? `option ${option === item.answer ? "correct" : "wrong"}` : "option";
           return (
-            <button className={className} key={option} onClick={() => onAnswer(option)} type="button">
+            <button className={className} disabled={disabled} key={option} onClick={() => onAnswer(option)} type="button">
               {option}
             </button>
           );
@@ -1129,6 +1472,22 @@ function buildMeaningExercises(vocabulary: Vocabulary[]): MeaningExercise[] {
   });
 }
 
+function buildReverseMeaningExercises(vocabulary: Vocabulary[]): ReverseMeaningExercise[] {
+  return vocabulary.slice(0, 10).map((item, index) => {
+    const wrongOptions = vocabulary
+      .filter((candidate) => candidate.id !== item.id)
+      .slice(index, index + 4)
+      .map((candidate) => candidate.term);
+
+    return {
+      id: item.id,
+      meaning: item.meaning,
+      answer: item.term,
+      options: shuffleItems([item.term, ...wrongOptions].slice(0, 4), item.id + index + 17)
+    };
+  });
+}
+
 function buildFillExercises(vocabulary: Vocabulary[]): FillExercise[] {
   return vocabulary.slice(0, 10).map((item, index) => {
     const source = (item.examples ?? [item.example])[0] ?? item.example;
@@ -1145,6 +1504,34 @@ function buildFillExercises(vocabulary: Vocabulary[]): FillExercise[] {
       meaning: item.meaning,
       answer: item.term,
       options
+    };
+  });
+}
+
+function buildSentenceChoiceExercises(vocabulary: Vocabulary[], sentencePatterns: SentencePattern[]): SentenceChoiceExercise[] {
+  if (sentencePatterns.length === 0) return [];
+
+  return sentencePatterns.slice(0, 8).map((item, index) => {
+    const linkedTerm =
+      item.term ??
+      vocabulary.find((word) => word.id === item.vocabularyId)?.term ??
+      vocabulary[index % Math.max(vocabulary.length, 1)]?.term ??
+      "keyword";
+    const wrongOptions = sentencePatterns
+      .filter((candidate) => candidate.id !== item.id)
+      .slice(index + 1, index + 4)
+      .map((candidate) => candidate.sentence);
+    const fallbackOptions = vocabulary
+      .filter((word) => word.term.toLowerCase() !== linkedTerm.toLowerCase())
+      .slice(0, 3)
+      .map((word) => `The team reviewed the ${word.term} before the meeting.`);
+
+    return {
+      id: item.id,
+      prompt: `Chon cau dung voi mau: ${item.meaning}`,
+      answer: item.sentence,
+      options: shuffleItems([item.sentence, ...wrongOptions, ...fallbackOptions].slice(0, 4), item.id + index + 29),
+      explanation: `${linkedTerm}: ${item.meaning}`
     };
   });
 }
@@ -1203,8 +1590,8 @@ function buildStudyLessons(data: ToeicData): StudyLesson[] {
       conversation,
       tasks: [
         `Hoc ${vocabulary.length} tu va danh dau da hoc.`,
-        "Doc 2 cau vi du cho moi tu.",
-        "Doc doan van lien quan va lam quiz ca nhan hoa."
+        "Lam bai ghep nghia, chon tu theo nghia Viet va dien tu theo ngu canh.",
+        "Doc mau cau, hoi thoai, doan van va lam quiz ca nhan hoa."
       ]
     };
   });
@@ -1235,6 +1622,10 @@ function formatCompletionDate(value?: string) {
   } catch {
     return "da luu";
   }
+}
+
+function canSaveProgress(userId: string | null | undefined, progressLoaded: boolean, loadedUserId: string | null) {
+  return Boolean(userId && progressLoaded && loadedUserId === userId);
 }
 
 function createEmptyProgress(): UserProgress {
