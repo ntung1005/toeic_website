@@ -1,6 +1,6 @@
 "use client";
 
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
@@ -307,72 +307,31 @@ export default function StudyApp({
   const [progressStatus, setProgressStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   useEffect(() => {
-    let cancelled = false;
+    setProgressLoaded(false);
+    setLoadedUserId(null);
+    setProgressStatus("idle");
 
-    async function loadProgress() {
-      setProgressLoaded(false);
-      setLoadedUserId(null);
-      setProgressStatus("idle");
-
-      if (!userId) {
-        const emptyProgress = createEmptyProgress();
-        setLearnedIds(emptyProgress.learnedIds);
-        setAnswers(emptyProgress.answers);
-        setCompletedLessons(emptyProgress.completedLessons);
-        setCompletedLessonDetails(emptyProgress.completedLessonDetails ?? {});
-        setSelectedLessonId(emptyProgress.selectedLessonId ?? 1);
-        if (!cancelled) {
-          setProgressLoaded(true);
-          setLoadedUserId(null);
-        }
-        return;
-      }
-
-      const snapshot = await getDoc(doc(db, "users", userId, "progress", "toeicStarter"));
-      const parsed = snapshot.exists() ? (snapshot.data() as UserProgress) : createEmptyProgress();
-      if (cancelled) return;
-
-      setLearnedIds(parsed.learnedIds ?? []);
-      setAnswers(parsed.answers ?? {});
-      setCompletedLessons(parsed.completedLessons ?? []);
-      setCompletedLessonDetails(parsed.completedLessonDetails ?? {});
-      setSelectedLessonId(parsed.selectedLessonId ?? 1);
-      if (!cancelled) {
-        setProgressLoaded(true);
-        setLoadedUserId(userId);
-        setProgressStatus("saved");
-      }
+    if (!userId) {
+      applyProgressToState(createEmptyProgress());
+      setProgressLoaded(true);
+      return;
     }
 
-    loadProgress().catch(() => {
-      if (!cancelled) {
+    return onSnapshot(
+      doc(db, "users", userId, "progress", "toeicStarter"),
+      (snapshot) => {
+        applyProgressToState(snapshot.exists() ? (snapshot.data() as UserProgress) : createEmptyProgress());
+        setLoadedUserId(userId);
+        setProgressLoaded(true);
+        setProgressStatus("saved");
+      },
+      () => {
         setProgressLoaded(false);
         setLoadedUserId(null);
         setProgressStatus("error");
       }
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    );
   }, [userId]);
-
-  useEffect(() => {
-    if (!progressLoaded || !userId || loadedUserId !== userId) return;
-    const progress = createProgressPayload({
-      userId,
-      learnedIds,
-      answers,
-      completedLessons,
-      completedLessonDetails,
-      selectedLessonId
-    });
-
-    setProgressStatus("saving");
-    persistUserProgress(userId, progress)
-      .then(() => setProgressStatus("saved"))
-      .catch(() => setProgressStatus("error"));
-  }, [learnedIds, answers, completedLessons, completedLessonDetails, selectedLessonId, progressLoaded, loadedUserId, userId]);
 
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
@@ -426,13 +385,31 @@ export default function StudyApp({
   }, 0);
 
   function toggleLearned(id: number) {
-    if (!canSaveProgress(userId, progressLoaded, loadedUserId)) return;
-    setLearnedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+    if (!userId || !canSaveProgress(userId, progressLoaded, loadedUserId)) return;
+    const nextLearnedIds = learnedIds.includes(id) ? learnedIds.filter((item) => item !== id) : [...learnedIds, id];
+    setLearnedIds(nextLearnedIds);
+    saveProgressNow({
+      userId,
+      learnedIds: nextLearnedIds,
+      answers,
+      completedLessons,
+      completedLessonDetails,
+      selectedLessonId
+    });
   }
 
   function answerExercise(key: string, option: string) {
-    if (!canSaveProgress(userId, progressLoaded, loadedUserId)) return;
-    setAnswers((current) => ({ ...current, [key]: option }));
+    if (!userId || !canSaveProgress(userId, progressLoaded, loadedUserId)) return;
+    const nextAnswers = { ...answers, [key]: option };
+    setAnswers(nextAnswers);
+    saveProgressNow({
+      userId,
+      learnedIds,
+      answers: nextAnswers,
+      completedLessons,
+      completedLessonDetails,
+      selectedLessonId
+    });
   }
 
   function toggleCompleteLesson(lesson: StudyLesson) {
@@ -491,6 +468,14 @@ export default function StudyApp({
     persistUserProgress(progressInput.userId, progress)
       .then(() => setProgressStatus("saved"))
       .catch(() => setProgressStatus("error"));
+  }
+
+  function applyProgressToState(progress: UserProgress) {
+    setLearnedIds(progress.learnedIds ?? []);
+    setAnswers(progress.answers ?? {});
+    setCompletedLessons(progress.completedLessons ?? []);
+    setCompletedLessonDetails(progress.completedLessonDetails ?? {});
+    setSelectedLessonId(progress.selectedLessonId ?? 1);
   }
 
   return (
