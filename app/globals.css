@@ -776,6 +776,40 @@ h1 {
   font-size: 1.1rem;
 }
 
+.vocab-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vocab-heading > div {
+  min-width: 0;
+}
+
+.phonetic {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.audio-button {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1px solid var(--teal);
+  background: var(--green-soft);
+  color: var(--teal);
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
 .tag,
 .topic-pill {
   flex: 0 0 auto;

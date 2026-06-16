@@ -12,6 +12,8 @@ type Vocabulary = {
   topic: string;
   example: string;
   examples?: string[];
+  phonetic?: string;
+  audioUrl?: string;
   sentenceIds?: number[];
 };
 
@@ -678,7 +680,7 @@ function LessonView({
           {lesson.vocabulary.map((item) => (
             <article className={`item-card ${learnedSet.has(item.id) ? "learned-card" : ""}`} key={item.id}>
               <div className="item-top">
-                <h3 className="term">{item.term}</h3>
+                <VocabularyHeader item={item} />
                 <button className="learn-toggle" disabled={progressLocked} onClick={() => onToggleLearned(item.id)} type="button">
                   {learnedSet.has(item.id) ? "Da hoc" : "Danh dau"}
                 </button>
@@ -961,6 +963,38 @@ function LessonView({
   );
 }
 
+function VocabularyHeader({ item }: { item: Vocabulary }) {
+  const phonetic = item.phonetic ?? getPhonetic(item.term);
+
+  return (
+    <div className="vocab-heading">
+      <div>
+        <h3 className="term">{item.term}</h3>
+        <span className="phonetic">{phonetic}</span>
+      </div>
+      <button className="audio-button" onClick={() => playPronunciation(item)} title={`Nghe phat am ${item.term}`} type="button">
+        ▶
+      </button>
+    </div>
+  );
+}
+
+function playPronunciation(item: Vocabulary) {
+  if (item.audioUrl) {
+    const audio = new Audio(item.audioUrl);
+    audio.play().catch(() => undefined);
+    return;
+  }
+
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(item.term);
+  utterance.lang = "en-US";
+  utterance.rate = item.term.includes(" ") ? 0.82 : 0.9;
+  window.speechSynthesis.speak(utterance);
+}
+
 function ProgressDashboard({
   userId,
   username,
@@ -1184,7 +1218,7 @@ function renderMainContent({
         {vocabulary.map((item) => (
           <article className={`item-card ${learnedSet.has(item.id) ? "learned-card" : ""}`} key={item.id}>
             <div className="item-top">
-              <h3 className="term">{item.term}</h3>
+              <VocabularyHeader item={item} />
               <div className="card-actions">
                 <span className="tag">{item.topic}</span>
                 <button className="learn-toggle" onClick={() => onToggleLearned(item.id)} type="button">
@@ -1465,6 +1499,95 @@ function buildLearnedQuiz(learnedVocabulary: Vocabulary[], allVocabulary: Vocabu
         explanation: `${item.term}: ${item.meaning}. Vi du: ${(item.examples ?? [item.example])[0]}`
       };
     });
+}
+
+const PHONETIC_MAP: Record<string, string> = {
+  "abide by": "/əˈbaɪd baɪ/",
+  agreement: "/əˈɡriːmənt/",
+  assurance: "/əˈʃʊrəns/",
+  cancellation: "/ˌkænsəˈleɪʃən/",
+  determine: "/dɪˈtɜːrmɪn/",
+  engage: "/ɪnˈɡeɪdʒ/",
+  establish: "/ɪˈstæblɪʃ/",
+  obligate: "/ˈɑːblɪɡeɪt/",
+  party: "/ˈpɑːrti/",
+  provision: "/prəˈvɪʒən/",
+  resolve: "/rɪˈzɑːlv/",
+  specific: "/spəˈsɪfɪk/",
+  appointment: "/əˈpɔɪntmənt/",
+  agenda: "/əˈdʒendə/",
+  assistant: "/əˈsɪstənt/",
+  candidate: "/ˈkændɪdət/",
+  colleague: "/ˈkɑːliːɡ/",
+  conference: "/ˈkɑːnfərəns/",
+  deadline: "/ˈdedlaɪn/",
+  department: "/dɪˈpɑːrtmənt/",
+  document: "/ˈdɑːkjumənt/",
+  headquarters: "/ˈhedkwɔːrtərz/",
+  proposal: "/prəˈpoʊzəl/",
+  receptionist: "/rɪˈsepʃənɪst/",
+  schedule: "/ˈskedʒuːl/",
+  supervisor: "/ˈsuːpərvaɪzər/",
+  attendance: "/əˈtendəns/",
+  attendee: "/əˌtenˈdiː/",
+  consensus: "/kənˈsensəs/",
+  discussion: "/dɪˈskʌʃən/",
+  feedback: "/ˈfiːdbæk/",
+  objective: "/əbˈdʒektɪv/",
+  participant: "/pɑːrˈtɪsɪpənt/",
+  presentation: "/ˌprezənˈteɪʃən/",
+  recommendation: "/ˌrekəmenˈdeɪʃən/",
+  reschedule: "/ˌriːˈskedʒuːl/",
+  accommodation: "/əˌkɑːməˈdeɪʃən/",
+  arrival: "/əˈraɪvəl/",
+  baggage: "/ˈbæɡɪdʒ/",
+  boarding: "/ˈbɔːrdɪŋ/",
+  customs: "/ˈkʌstəmz/",
+  departure: "/dɪˈpɑːrtʃər/",
+  destination: "/ˌdestɪˈneɪʃən/",
+  itinerary: "/aɪˈtɪnəreri/",
+  luggage: "/ˈlʌɡɪdʒ/",
+  reservation: "/ˌrezərˈveɪʃən/",
+  terminal: "/ˈtɜːrmɪnəl/",
+  amenity: "/əˈmenəti/",
+  concierge: "/ˌkɑːnsiˈerʒ/",
+  confirmation: "/ˌkɑːnfərˈmeɪʃən/",
+  housekeeping: "/ˈhaʊskiːpɪŋ/",
+  occupancy: "/ˈɑːkjəpənsi/",
+  complimentary: "/ˌkɑːmplɪˈmentəri/",
+  appetizer: "/ˈæpɪtaɪzər/",
+  beverage: "/ˈbevərɪdʒ/",
+  buffet: "/bəˈfeɪ/",
+  ingredient: "/ɪnˈɡriːdiənt/",
+  vegetarian: "/ˌvedʒəˈteriən/",
+  cashier: "/kæˈʃɪr/",
+  coupon: "/ˈkuːpɑːn/",
+  discount: "/ˈdɪskaʊnt/",
+  exchange: "/ɪksˈtʃeɪndʒ/",
+  inventory: "/ˈɪnvəntɔːri/",
+  merchandise: "/ˈmɜːrtʃəndaɪs/",
+  purchase: "/ˈpɜːrtʃəs/",
+  receipt: "/rɪˈsiːt/",
+  supplier: "/səˈplaɪər/",
+  warranty: "/ˈwɔːrənti/",
+  accounting: "/əˈkaʊntɪŋ/",
+  balance: "/ˈbæləns/",
+  budget: "/ˈbʌdʒɪt/",
+  currency: "/ˈkɜːrənsi/",
+  deposit: "/dɪˈpɑːzɪt/",
+  expense: "/ɪkˈspens/",
+  invoice: "/ˈɪnvɔɪs/",
+  payroll: "/ˈpeɪroʊl/",
+  profit: "/ˈprɑːfɪt/",
+  revenue: "/ˈrevənuː/",
+  transaction: "/trænˈzækʃən/"
+};
+
+function getPhonetic(term: string) {
+  const normalized = term.toLowerCase();
+  if (PHONETIC_MAP[normalized]) return PHONETIC_MAP[normalized];
+  if (normalized.includes(" ")) return normalized.split(/\s+/).map((word) => PHONETIC_MAP[word] ?? `/${word}/`).join(" ");
+  return `/${term}/`;
 }
 
 function buildMeaningExercises(vocabulary: Vocabulary[]): MeaningExercise[] {

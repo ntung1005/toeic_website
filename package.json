@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "generate:phonetics": "node scripts/generate-phonetics.mjs",
     "seed:firebase": "node scripts/seed-firestore.mjs",
     "lint": "next lint"
   },
@@ -19,6 +20,7 @@
     "@types/node": "^22.15.30",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
+    "cmu-pronouncing-dictionary": "^3.0.0",
     "eslint": "^9.28.0",
     "eslint-config-next": "^15.3.3",
     "typescript": "^5.8.3"
